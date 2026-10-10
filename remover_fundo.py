@@ -23,7 +23,7 @@ import sys
 import time
 import argparse
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Optional
 
 # Força codificação UTF-8 no terminal Windows para evitar UnicodeEncodeError
 if sys.platform == "win32":
@@ -119,7 +119,7 @@ def remover_fundo_local(imagem_path: Path, session=None) -> Image.Image:
     except Image.DecompressionBombError:
         raise ValueError("A imagem excede os limites máximos de segurança (Decompression Bomb).")
 
-def remover_fundo_google_gemini(imagem_path: Path, api_key: str) -> Image.Image:
+def remover_fundo_google_gemini(imagem_path: Path, api_key: str, session=None) -> Image.Image:
     """
     Remove o fundo utilizando Google Gemini com proteção de credenciais.
     Assegura que a chave nunca seja exposta em logs ou mensagens de erro.
@@ -147,13 +147,14 @@ def remover_fundo_google_gemini(imagem_path: Path, api_key: str) -> Image.Image:
         print(f"{Fore.YELLOW}  Prosseguindo com segmentação de rede neural local...{Style.RESET_ALL}")
     
     # Processa remoção com máxima qualidade usando modelo neural
-    return remover_fundo_local(imagem_path)
+    return remover_fundo_local(imagem_path, session=session)
 
 def processar_lista_imagens(
     lista_imagens: List[Path], 
     pasta_saida: Path, 
     modo_ia: str = "local", 
-    google_api_key: Optional[str] = None
+    google_api_key: Optional[str] = None,
+    sobrescrever: bool = False,
 ):
     """Executa o processamento em lote da lista de imagens fornecida."""
     if not lista_imagens:
@@ -174,27 +175,32 @@ def processar_lista_imagens(
     print(f"🔒 Camada de Segurança: {Fore.CYAN}Criptografia AES + DPAPI e Sanitização Ativa{Style.RESET_ALL}")
     print(f"{Fore.CYAN}{'-'*60}\n")
     
-    session = None
-    if modo_ia == "local":
-        print(f"{Fore.CYAN}Carregando modelo de IA (U2-Net)... Aguarde alguns instantes...{Style.RESET_ALL}")
-        from rembg import new_session
-        session = new_session("u2net")
-        print(f"{Fore.GREEN}✔ Modelo de IA pronto para processamento!{Style.RESET_ALL}\n")
-    
+    # O modelo local é usado em ambos os modos; carregá-lo uma única vez evita recarregar a cada imagem
+    print(f"{Fore.CYAN}Carregando modelo de IA (U2-Net)... Aguarde alguns instantes...{Style.RESET_ALL}")
+    from rembg import new_session
+    session = new_session("u2net")
+    print(f"{Fore.GREEN}✔ Modelo de IA pronto para processamento!{Style.RESET_ALL}\n")
+
     sucessos = 0
     erros = 0
+    ignoradas = 0
     inicio_total = time.time()
     
     for indice, img_path in enumerate(lista_imagens, 1):
         nome_arquivo = img_path.name
         arquivo_saida = gerar_nome_saida_seguro(pasta_saida, img_path.stem)
         
+        if arquivo_saida.exists() and not sobrescrever:
+            print(f"[{indice}/{len(lista_imagens)}] {Fore.YELLOW}Ignorada (já existe): {arquivo_saida.name}{Style.RESET_ALL}")
+            ignoradas += 1
+            continue
+
         print(f"[{indice}/{len(lista_imagens)}] Processando: {Fore.WHITE}{nome_arquivo}{Style.RESET_ALL} ... ", end="", flush=True)
         inicio_img = time.time()
         
         try:
             if modo_ia == "google" and google_api_key:
-                resultado_png = remover_fundo_google_gemini(img_path, google_api_key)
+                resultado_png = remover_fundo_google_gemini(img_path, google_api_key, session=session)
             else:
                 resultado_png = remover_fundo_local(img_path, session=session)
             
@@ -213,6 +219,8 @@ def processar_lista_imagens(
     print(f"{Fore.GREEN}{Style.BRIGHT}  PROCESSAMENTO CONCLUÍDO!")
     print(f"{Fore.CYAN}{'='*60}")
     print(f"  ✔ Sucessos    : {Fore.GREEN}{sucessos}")
+    if ignoradas > 0:
+        print(f"  ⏭️  Ignoradas   : {Fore.YELLOW}{ignoradas} (use --sobrescrever para refazer)")
     if erros > 0:
         print(f"  ❌ Falhas      : {Fore.RED}{erros}")
     print(f"  ⏱️  Tempo total : {Fore.WHITE}{tempo_total:.2f} segundos")
@@ -313,6 +321,7 @@ def main():
     parser.add_argument("--api-key", default=None, help="Chave de API Google (opcional; prioriza cofre criptografado)")
     parser.add_argument("--entrada", default=None, help="Caminho personalizado da pasta de entrada")
     parser.add_argument("--saida", default=None, help="Caminho personalizado da pasta de saída")
+    parser.add_argument("--sobrescrever", action="store_true", help="Refaz imagens cujo resultado já existe na pasta de saída")
     parser.add_argument("--gerenciar-chave", action="store_true", help="Abre o menu de gerenciamento seguro de chave")
     
     args = parser.parse_args()
@@ -323,6 +332,7 @@ def main():
 
     base_dir = Path(__file__).resolve().parent
     pasta_saida = Path(args.saida) if args.saida else obter_pasta_saida(base_dir)
+    pasta_saida.mkdir(parents=True, exist_ok=True)
 
     # Suporte a arquivos/pastas passados via argumento (ex: arrastados para cima do .bat)
     if args.alvos:
@@ -336,7 +346,7 @@ def main():
         
         modo = args.modo or "local"
         api_key = args.api_key or seguranca.obter_chave_gemini_segura(solicitar_se_ausente=(modo == "google"))
-        processar_lista_imagens(lista_imagens, pasta_saida, modo_ia=modo, google_api_key=api_key)
+        processar_lista_imagens(lista_imagens, pasta_saida, modo_ia=modo, google_api_key=api_key, sobrescrever=args.sobrescrever)
         return
 
     pasta_entrada = Path(args.entrada) if args.entrada else obter_pasta_entrada(base_dir)
@@ -346,7 +356,7 @@ def main():
         modo = args.modo or "local"
         api_key = args.api_key or seguranca.obter_chave_gemini_segura(solicitar_se_ausente=(modo == "google"))
         imagens = listar_imagens(pasta_entrada)
-        processar_lista_imagens(imagens, pasta_saida, modo_ia=modo, google_api_key=api_key)
+        processar_lista_imagens(imagens, pasta_saida, modo_ia=modo, google_api_key=api_key, sobrescrever=args.sobrescrever)
         return
 
     # Execução padrão do .bat com menu interativo veloz
