@@ -1,0 +1,108 @@
+# =============================================================================
+# .gitignore - Removedor de Fundos com Inteligência Artificial
+# =============================================================================
+# Proteção estrita de segurança, credenciais criptografadas, chaves e privacidade
+# =============================================================================
+
+# --- 1. SEGURANÇA E DADOS CONFIDENCIAIS (CRÍTICO) ---
+# Chaves criptografadas e arquivos de segredos locais
+*.key
+*.enc
+*.secret
+*.pem
+*.crt
+*.pfx
+.credenciais.enc
+.secrets.key
+master.key*
+
+# Arquivos de ambiente e tokens de API
+.env
+.env.*
+!.env.example
+*.token
+tokens.json
+credentials.json
+client_secret*.json
+service_account*.json
+
+# --- 2. PRIVACIDADE DE DADOS DO USUÁRIO ---
+# Impede o upload acidental de fotos pessoais de entrada e saída
+[iI]magens/*
+![iI]magens/.gitkeep
+[iI]magensSemFundo/*
+![iI]magensSemFundo/.gitkeep
+
+# Imagens soltas na raiz
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.bmp
+*.tiff
+*.tif
+
+# --- 3. AMBIENTE VIRTUAL E DEPENDÊNCIAS PYTHON ---
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- 4. CACHE PYTHON E ARQUIVOS COMPILADOS ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- 5. MODELOS NEURAIS E CACHES PESADOS ---
+*.onnx
+*.pth
+*.pt
+*.bin
+*.weights
+.rembg/
+.u2net/
+
+# --- 6. ARQUIVOS TEMPORÁRIOS E LOGS ---
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+# --- 7. SISTEMA OPERACIONAL (WINDOWS / MACOS / LINUX) ---
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# --- 8. CONFIGURAÇÕES DE EDITOR E IDE ---
+.vscode/*
+!.vscode/settings.json
+.idea/
+*.sublime-project
+*.sublime-workspace
